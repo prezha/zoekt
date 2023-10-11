@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"strings"
 	"time"
 
 	"github.com/felixge/fgprof"
@@ -31,20 +32,45 @@ import (
 	"github.com/sourcegraph/zoekt/shards"
 )
 
+const (
+	lineMatchesPerFile   = 3
+	fileMatchesPerSearch = 6
+)
+
+func splitAtIndex[E any](s []E, idx int) ([]E, []E) {
+	if idx < len(s) {
+		return s[:idx], s[idx:]
+	}
+	return s, nil
+}
+
 func displayMatches(files []zoekt.FileMatch, pat string, withRepo bool, list bool) {
+	files, hiddenFiles := splitAtIndex(files, fileMatchesPerSearch)
 	for _, f := range files {
 		r := ""
 		if withRepo {
 			r = f.Repository + "/"
 		}
+		fmt.Printf("%s%s%s\n", r, f.FileName, addTabIfNonEmpty(f.Debug))
+
 		if list {
-			fmt.Printf("%s%s%s\n", r, f.FileName, addTabIfNonEmpty(f.Debug))
 			continue
 		}
 
-		for _, m := range f.LineMatches {
-			fmt.Printf("%s%s:%d:%s%s\n", r, f.FileName, m.LineNumber, m.Line, addTabIfNonEmpty(f.Debug))
+		lines, hidden := splitAtIndex(f.LineMatches, lineMatchesPerFile)
+
+		for _, m := range lines {
+			fmt.Printf("%d:%s%s\n", m.LineNumber, m.Line, addTabIfNonEmpty(f.Debug))
 		}
+
+		if len(hidden) > 0 {
+			fmt.Printf("hidden %d more line matches\n", len(hidden))
+		}
+		fmt.Println()
+	}
+
+	if len(hiddenFiles) > 0 {
+		fmt.Printf("hidden %d more file matches\n", len(hiddenFiles))
 	}
 }
 
@@ -156,7 +182,11 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	pat := flag.Arg(0)
+	pat := strings.Join(flag.Args(), " ")
+
+	if !*verbose {
+		log.SetOutput(io.Discard)
+	}
 
 	var searcher zoekt.Searcher
 	var err error

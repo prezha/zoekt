@@ -228,6 +228,10 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 		if remoteURL == "" {
 			return nil
 		}
+		// Hack for scp URLs
+		if strings.HasPrefix(remoteURL, "git@") {
+			remoteURL = "https://" + strings.Replace(strings.TrimPrefix(remoteURL, "git@"), ":", "/", 1)
+		}
 		u, err := url.Parse(remoteURL)
 		if err != nil {
 			return err

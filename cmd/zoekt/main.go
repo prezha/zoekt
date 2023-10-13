@@ -186,6 +186,7 @@ func main() {
 	withRepo := flag.Bool("r", false, "print the repo before the file name")
 	list := flag.Bool("l", false, "print matching filenames only")
 	sym := flag.Bool("sym", false, "do experimental symbol search")
+	keyword := flag.Bool("keyword", false, "enable experimental keyword scoring")
 
 	flag.Usage = func() {
 		name := os.Args[0]
@@ -233,7 +234,8 @@ func main() {
 	}
 
 	sOpts := zoekt.SearchOptions{
-		DebugScore: *debug,
+		DebugScore:        *debug,
+		UseKeywordScoring: *keyword,
 	}
 	sres, err := searcher.Search(context.Background(), q, &sOpts)
 	if err != nil {

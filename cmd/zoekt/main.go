@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	"github.com/sourcegraph/zoekt"
 	"github.com/sourcegraph/zoekt/query"
 	"github.com/sourcegraph/zoekt/shards"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -44,12 +46,17 @@ func splitAtIndex[E any](s []E, idx int) ([]E, []E) {
 	return s, nil
 }
 
-func displayMatches(files []zoekt.FileMatch, pat string, withRepo bool, list bool) {
+func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool, list bool) {
+	fmt.Printf("------- QUERY: %s -------\n\n", queryMatch.Query)
+
 	files, hiddenFiles := splitAtIndex(files, fileMatchesPerSearch)
 	for _, f := range files {
 		r := ""
 		if withRepo {
 			r = f.Repository + "/"
+		}
+		if slices.Contains(queryMatch.Files, f.FileName) {
+			fmt.Printf("*** ")
 		}
 		fmt.Printf("%s%s%s\n", r, f.FileName, addTabIfNonEmpty(f.Debug))
 
@@ -60,7 +67,7 @@ func displayMatches(files []zoekt.FileMatch, pat string, withRepo bool, list boo
 		lines, hidden := splitAtIndex(f.LineMatches, lineMatchesPerFile)
 
 		for _, m := range lines {
-			fmt.Printf("%d:%s%s\n", m.LineNumber, m.Line, addTabIfNonEmpty(f.Debug))
+			fmt.Printf("%d:%s%s\n", m.LineNumber, m.Line, addTabIfNonEmpty(m.DebugScore))
 		}
 
 		if len(hidden) > 0 {
@@ -72,6 +79,7 @@ func displayMatches(files []zoekt.FileMatch, pat string, withRepo bool, list boo
 	if len(hiddenFiles) > 0 {
 		fmt.Printf("hidden %d more file matches\n", len(hiddenFiles))
 	}
+	fmt.Println()
 }
 
 func addTabIfNonEmpty(s string) string {
@@ -187,6 +195,7 @@ func main() {
 	list := flag.Bool("l", false, "print matching filenames only")
 	sym := flag.Bool("sym", false, "do experimental symbol search")
 	keyword := flag.Bool("keyword", false, "enable experimental keyword scoring")
+	queries := flag.String("queries", "", "file containing a list of queries to run")
 
 	flag.Usage = func() {
 		name := os.Args[0]
@@ -196,13 +205,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\n")
 	}
 	flag.Parse()
-
-	if len(flag.Args()) == 0 {
-		fmt.Fprintf(os.Stderr, "Pattern is missing.\n")
-		flag.Usage()
-		os.Exit(2)
-	}
-	pat := strings.Join(flag.Args(), " ")
 
 	if !*verbose {
 		log.SetOutput(io.Discard)
@@ -220,39 +222,80 @@ func main() {
 		log.Fatal(err)
 	}
 
-	q, err := query.Parse(pat)
+	pat := strings.Join(flag.Args(), " ")
+	var queryCases []QueryCase
+	if *queries != "" {
+		if pat != "" {
+			fmt.Fprintf(os.Stderr, "Pattern cannot be specified when using queries file.\n")
+			os.Exit(2)
+		}
+		queryCases = loadQueries(*queries)
+	} else {
+		if pat == "" {
+			fmt.Fprintf(os.Stderr, "Pattern is missing.\n")
+			flag.Usage()
+			os.Exit(2)
+		}
+		queryCases = []QueryCase{{Query: pat}}
+	}
+
+	for _, c := range queryCases {
+		q, err := query.Parse(c.Query)
+		if err != nil {
+			log.Fatal(err)
+		}
+		q = query.Map(q, query.ExpandFileContent)
+		if *sym {
+			q = toSymbolQuery(q)
+		}
+		q = query.Simplify(q)
+		if *verbose {
+			log.Println("query:", q)
+		}
+
+		sOpts := zoekt.SearchOptions{
+			DebugScore:        *debug,
+			UseKeywordScoring: *keyword,
+		}
+		sres, err := searcher.Search(context.Background(), q, &sOpts)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// If profiling, do it another time so we measure with
+		// warm caches.
+		for run := startCPUProfile(*cpuProfile, *profileTime); run(); {
+			sres, _ = searcher.Search(context.Background(), q, &sOpts)
+		}
+		for run := startFullProfile(*fullProfile, *profileTime); run(); {
+			sres, _ = searcher.Search(context.Background(), q, &sOpts)
+		}
+
+		displayMatches(sres.Files, c, *withRepo, *list)
+		if *verbose {
+			log.Printf("stats: %#v", sres.Stats)
+		}
+	}
+}
+
+type QueryCase struct {
+	// The query to run.
+	Query string `json:"query"`
+	// Files that are expected to match the query.
+	Files []string `json:"files"`
+}
+
+func loadQueries(queryFile string) []QueryCase {
+	jsonFile, err := os.Open(queryFile)
 	if err != nil {
 		log.Fatal(err)
 	}
-	q = query.Map(q, query.ExpandFileContent)
-	if *sym {
-		q = toSymbolQuery(q)
-	}
-	q = query.Simplify(q)
-	if *verbose {
-		log.Println("query:", q)
-	}
 
-	sOpts := zoekt.SearchOptions{
-		DebugScore:        *debug,
-		UseKeywordScoring: *keyword,
-	}
-	sres, err := searcher.Search(context.Background(), q, &sOpts)
+	var queryMatches []QueryCase
+	decoder := json.NewDecoder(jsonFile)
+	err = decoder.Decode(&queryMatches)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// If profiling, do it another time so we measure with
-	// warm caches.
-	for run := startCPUProfile(*cpuProfile, *profileTime); run(); {
-		sres, _ = searcher.Search(context.Background(), q, &sOpts)
-	}
-	for run := startFullProfile(*fullProfile, *profileTime); run(); {
-		sres, _ = searcher.Search(context.Background(), q, &sOpts)
-	}
-
-	displayMatches(sres.Files, pat, *withRepo, *list)
-	if *verbose {
-		log.Printf("stats: %#v", sres.Stats)
-	}
+	return queryMatches
 }

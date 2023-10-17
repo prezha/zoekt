@@ -1,0 +1,20 @@
+[
+    {"query": "InternalDoer", "files": [
+        "internal/httpcli/client.go"
+    ]},
+    {"query": "search options", "files": [
+        "internal/search/backend/index_options.go"
+    ]},
+    {"query": "repository filter", "files": [
+        "internal/search/query/repo_revs.go",
+        "internal/search/query/types.go"
+    ]},
+    {"query": "graphql site user", "files":  [
+        "cmd/frontend/graphqlbackend/schema.graphql"]
+    },
+    {"query": "permissions docs", "files": [
+        "doc/admin/permissions/index.md",
+        "doc/admin/permissions/api.md"
+    ]}
+]
+

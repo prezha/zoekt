@@ -30,7 +30,6 @@ require (
 	github.com/prometheus/procfs v0.11.0
 	github.com/rs/xid v1.5.0
 	github.com/shirou/gopsutil/v3 v3.23.5
-	github.com/sourcegraph/go-ctags v0.0.0-20230929045819-c736fcb519eb
 	github.com/sourcegraph/log v0.0.0-20231018134238-fbadff7458bb
 	github.com/sourcegraph/mountinfo v0.0.0-20231018142932-e00da332dac5
 	github.com/stretchr/testify v1.8.4
@@ -141,5 +140,8 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// enable markdown still in progress https://github.com/sourcegraph/go-ctags/pull/14
+require github.com/sourcegraph/go-ctags v0.0.0-20231019074229-146991f4c3dd
 
 go 1.18

@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"os"
 	"path"
 	"sort"
 	"strings"
@@ -945,18 +944,12 @@ func sortChunkMatchesByScore(ms []ChunkMatch) {
 	sort.Sort(chunkMatchScoreSlice(ms))
 }
 
-var doNovelty = os.Getenv("ZOEKT_NOVELTY") != ""
-
 // SortFiles sorts files matches. The order depends on the match score, which includes both
 // query-dependent signals like word overlap, and file-only signals like the file ranks (if
 // file ranks are enabled).
 func SortFiles(ms []FileMatch) {
 	sort.Sort(fileMatchesByScore(ms))
-
-	if doNovelty {
-		// Experimentally boost something into the third filematch
-		boostNovelExtension(ms, 2, 0.9)
-	}
+	boostNovelExtension(ms, 2, 0.9)
 }
 
 func boostNovelExtension(ms []FileMatch, boostOffset int, minScoreRatio float64) {

@@ -47,7 +47,9 @@ func splitAtIndex[E any](s []E, idx int) ([]E, []E) {
 }
 
 func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool, list bool) {
-	fmt.Printf("------- QUERY: %s -------\n\n", queryMatch.Query)
+	if len(queryMatch.Files) > 0 {
+		fmt.Printf("------- QUERY: %s -------\n\n", queryMatch.Query)
+	}
 
 	files, hiddenFiles := splitAtIndex(files, fileMatchesPerSearch)
 	for _, f := range files {
@@ -79,7 +81,10 @@ func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool
 	if len(hiddenFiles) > 0 {
 		fmt.Printf("hidden %d more file matches\n", len(hiddenFiles))
 	}
-	fmt.Println()
+
+	if len(queryMatch.Files) > 0 {
+		fmt.Println()
+	}
 }
 
 func addTabIfNonEmpty(s string) string {

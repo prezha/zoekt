@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/felixge/fgprof"
 	"github.com/sourcegraph/zoekt"
 	"github.com/sourcegraph/zoekt/query"
@@ -51,6 +52,8 @@ func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool
 		fmt.Printf("------- QUERY: %s -------\n\n", queryMatch.Query)
 	}
 
+	green := color.New(color.FgGreen).SprintFunc()
+
 	files, hiddenFiles := splitAtIndex(files, fileMatchesPerSearch)
 	for _, f := range files {
 		r := ""
@@ -60,7 +63,7 @@ func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool
 		if slices.Contains(queryMatch.Files, f.FileName) {
 			fmt.Printf("*** ")
 		}
-		fmt.Printf("%s%s%s\n", r, f.FileName, addTabIfNonEmpty(f.Debug))
+		color.Magenta("%s%s%s\n", r, f.FileName, addTabIfNonEmpty(f.Debug))
 
 		if list {
 			continue
@@ -69,7 +72,7 @@ func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool
 		lines, hidden := splitAtIndex(f.LineMatches, lineMatchesPerFile)
 
 		for _, m := range lines {
-			fmt.Printf("%d:%s%s\n", m.LineNumber, m.Line, addTabIfNonEmpty(m.DebugScore))
+			fmt.Printf("%s:%s%s\n", green(m.LineNumber), m.Line, addTabIfNonEmpty(m.DebugScore))
 		}
 
 		if len(hidden) > 0 {

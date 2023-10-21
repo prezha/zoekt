@@ -53,6 +53,7 @@ func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool
 	}
 
 	green := color.New(color.FgGreen).SprintFunc()
+	blue := color.New(color.FgBlue).SprintFunc()
 
 	files, hiddenFiles := splitAtIndex(files, fileMatchesPerSearch)
 	for _, f := range files {
@@ -63,7 +64,7 @@ func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool
 		if slices.Contains(queryMatch.Files, f.FileName) {
 			fmt.Printf("*** ")
 		}
-		color.Magenta("%s%s%s\n", r, f.FileName, addTabIfNonEmpty(f.Debug))
+		color.Magenta("%s%s%s\n", r, f.FileName, addTabIfNonEmpty(blue(f.Debug)))
 
 		if list {
 			continue
@@ -72,7 +73,7 @@ func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool
 		lines, hidden := splitAtIndex(f.LineMatches, lineMatchesPerFile)
 
 		for _, m := range lines {
-			fmt.Printf("%s:%s%s\n", green(m.LineNumber), m.Line, addTabIfNonEmpty(m.DebugScore))
+			fmt.Printf("%s:%s%s\n", green(m.LineNumber), m.Line, addTabIfNonEmpty(blue(m.DebugScore)))
 		}
 
 		if len(hidden) > 0 {

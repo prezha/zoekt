@@ -73,7 +73,11 @@ func displayMatches(files []zoekt.FileMatch, queryMatch QueryCase, withRepo bool
 		lines, hidden := splitAtIndex(f.LineMatches, lineMatchesPerFile)
 
 		for _, m := range lines {
-			fmt.Printf("%s:%s%s\n", green(m.LineNumber), m.Line, addTabIfNonEmpty(blue(m.DebugScore)))
+			line := string(m.Line)
+			if len(line) > 80 {
+				line = line[:80] + "..."
+			}
+			fmt.Printf("%s:%s%s\n", green(m.LineNumber), line, addTabIfNonEmpty(blue(m.DebugScore)))
 		}
 
 		if len(hidden) > 0 {
